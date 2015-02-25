@@ -1,4 +1,5 @@
 import java.awt.BorderLayout;
+import java.awt.Color;
 import java.awt.EventQueue;
 import java.awt.Image;
 import java.awt.event.ActionEvent;
@@ -213,6 +214,7 @@ public class Steganography {
 	}
 	
 	private void encode() {
+		System.out.println("Test");
 		boolean success = false;
 		errorMessage = "";
 		if (coverImage==null) {
@@ -225,16 +227,18 @@ public class Steganography {
 			errorMessage = "Key belum dimasukkan!";
 		}
 		else {
-			if (comboBox.equals("LSB Standard")) {
+			//System.out.println(comboBox.getSelectedItem().toString());
+			if (comboBox.getSelectedItem().toString().equals("LSB Standard")) {
 				success = standardEncode(coverImage, stegoFile, txtKey.getText(), lblFileName.getText());
 			}
-			else if (comboBox.equals("LSB Xin Liao")) {
+			else if (comboBox.getSelectedItem().toString().equals("LSB Xin Liao")) {
 				success = xinLiaoEncode(coverImage, stegoFile, txtKey.getText(), lblFileName.getText());
 			}
 			else { // comboBox.equals("LSB Gandharba Swain")
 				success = gandharbaEncode(coverImage, stegoFile, txtKey.getText(), lblFileName.getText());
 			}
 		}
+		
 		if (!success) {
 			JOptionPane.showMessageDialog(frame, errorMessage);
 		}
@@ -291,11 +295,42 @@ public class Steganography {
 		return false;
 	}
 	
+	//isinya y0-y3
+	private float avgDiffValue(int[] y){
+		int ymin = y[0];
+		for(int i=1;i<4;i++){
+			if(y[i] < ymin){
+				ymin = y[i];
+			}
+		}
+		
+		float d = 0;
+		
+		for(int i=0;i<4;i++){
+			d += (y[i] - ymin);
+		}
+		
+		d /= 3;
+		
+		return d;
+	}
+	
 	private boolean xinLiaoEncode(BufferedImage coverImage, byte[] stegoBytes, String key, String fileName) {
 		// tulis image hasil encode di stegoImage
 		// tulis max capacity di lblCapacity.setText(text)
 		// return true kalo bisa di-encode, false kalo ga bisa
 		// kalo ga bisa di encode, tulis juga errornya kenapa di errorMessage
+		
+		System.out.println("Encode!");
+		
+		for(int i=0;i<coverImage.getWidth();i++){
+			for(int j=0;j<coverImage.getHeight();j++){
+				Color color = new Color(coverImage.getRGB(i, j));
+				System.out.println(color.getRed() + " " + color.getBlue() + " " + color.getBlue());
+			}
+		}
+		
+		
 		return false;
 	}
 	
