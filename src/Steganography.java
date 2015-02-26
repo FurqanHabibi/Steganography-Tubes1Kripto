@@ -356,7 +356,7 @@ public class Steganography {
 		return plaintext;
 	}
 	
-	private Image scaleImage(BufferedImage bi, int width, int height) {
+	public Image scaleImage(BufferedImage bi, int width, int height) {
         int newWidth = bi.getWidth();
         int newHeight = bi.getHeight();
         if (bi.getWidth() > width) {
