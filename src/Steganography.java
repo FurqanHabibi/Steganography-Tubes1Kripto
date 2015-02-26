@@ -12,6 +12,8 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.Random;
 
 import javax.imageio.ImageIO;
 import javax.swing.DefaultComboBoxModel;
@@ -97,6 +99,7 @@ public class Steganography {
 					File file = imageChooser.getSelectedFile();
 					try {
 						coverImage = ImageIO.read(file);
+						stegoImage = coverImage;
 					} catch (IOException e1) {
 						// TODO Auto-generated catch block
 						e1.printStackTrace();
@@ -124,6 +127,7 @@ public class Steganography {
 					File file = imageChooser.getSelectedFile();
 					try {
 						stegoImage = ImageIO.read(file);
+						coverImage = stegoImage;
 					} catch (IOException e1) {
 						// TODO Auto-generated catch block
 						e1.printStackTrace();
@@ -152,7 +156,6 @@ public class Steganography {
 					lblFileName.setText(file.getName());
 					try {
 						stegoFile = Files.readAllBytes(file.toPath());
-						System.out.println(stegoFile.length);
 					} catch (IOException e1) {
 						// TODO Auto-generated catch block
 						e1.printStackTrace();
@@ -214,14 +217,13 @@ public class Steganography {
 	}
 	
 	private void encode() {
-		System.out.println("Test");
 		boolean success = false;
 		errorMessage = "";
 		if (coverImage==null) {
 			errorMessage = "Cover image belum dipilih!";
 		}
 		else if (stegoFile==null) {
-			errorMessage = "File message belum dipilih!";
+			errorMessage = "Stego file belum dipilih!";
 		}
 		else if (txtKey.getText().equals("")) {
 			errorMessage = "Key belum dimasukkan!";
@@ -234,7 +236,7 @@ public class Steganography {
 			else if (comboBox.getSelectedItem().toString().equals("LSB Xin Liao")) {
 				success = xinLiaoEncode(coverImage, stegoFile, txtKey.getText(), lblFileName.getText());
 			}
-			else { // comboBox.equals("LSB Gandharba Swain")
+			else { // comboBox.getSelectedItem().toString().equals("LSB Gandharba Swain")
 				success = gandharbaEncode(coverImage, stegoFile, txtKey.getText(), lblFileName.getText());
 			}
 		}
@@ -259,13 +261,13 @@ public class Steganography {
 		}
 		else {
 			String key = txtKey.getText();
-			if (comboBox.equals("LSB Standard")) {
+			if (comboBox.getSelectedItem().toString().equals("LSB Standard")) {
 				success = standardDecode(coverImage, key);
 			}
-			else if (comboBox.equals("LSB Xin Liao")) {
+			else if (comboBox.getSelectedItem().toString().equals("LSB Xin Liao")) {
 				success = xinLiaoDecode(coverImage, key);
 			}
-			else { // comboBox.equals("LSB Gandharba Swain")
+			else { // comboBox.getSelectedItem().toString().equals("LSB Gandharba Swain")
 				success = gandharbaDecode(coverImage, key);
 			}
 		}
@@ -292,6 +294,192 @@ public class Steganography {
 		// tulis max capacity di lblCapacity.setText(text)
 		// return true kalo bisa di-encode, false kalo ga bisa
 		// kalo ga bisa di encode, tulis juga errornya kenapa di errorMessage
+		
+		// insert file properties, encrypt
+		byte[] fileProp = (fileName+"#"+Integer.toString(stegoBytes.length)+"#").getBytes(StandardCharsets.UTF_8);
+		byte[] dirtyStegoBytes = Arrays.copyOf(fileProp, fileProp.length+stegoBytes.length);
+		System.arraycopy(stegoFile, 0, dirtyStegoBytes, fileProp.length, stegoBytes.length);
+		dirtyStegoBytes = encryptVigenere(dirtyStegoBytes, key);
+		
+		// calculate capacity
+		int width = coverImage.getWidth();
+		int height = coverImage.getWidth();
+		int maxCapacity = (width*height*3)/8;
+		
+		// get pixel array
+		int[] pixelArray = new int[width*height];
+		coverImage.getRGB(0, 0, width, height, pixelArray, 0, width);
+		
+		// get random number generator
+		int seed = 0;
+		for  (int i=0; i<key.length(); i++) {
+			seed += (int)key.charAt(i);
+		}
+		seed = seed % (width*height);
+		Random rand = new Random(seed);
+		Integer[] randomInts = new Integer[width*height];
+	    for (int i = 0; i < randomInts.length; i++) {
+	    	randomInts[i] = i;
+	    }
+	    Collections.shuffle(Arrays.asList(randomInts), rand);
+		
+		// convert bytes to bits
+	    int stegoBitsLength = dirtyStegoBytes.length*8;
+	    stegoBitsLength+=(3-(stegoBitsLength%3));
+		int[] stegoBits = new int[stegoBitsLength];
+		for (int i=0; i<stegoBits.length; i++) {
+			stegoBits[i] = 0;
+		}
+		for (int i=0; i<dirtyStegoBytes.length; i++) {
+			stegoBits[i*8] = (dirtyStegoBytes[i]>>7)&1;
+			stegoBits[(i*8)+1] = (dirtyStegoBytes[i]>>6)&1;
+			stegoBits[(i*8)+2] = (dirtyStegoBytes[i]>>5)&1;
+			stegoBits[(i*8)+3] = (dirtyStegoBytes[i]>>4)&1;
+			stegoBits[(i*8)+4] = (dirtyStegoBytes[i]>>3)&1;
+			stegoBits[(i*8)+5] = (dirtyStegoBytes[i]>>2)&1;
+			stegoBits[(i*8)+6] = (dirtyStegoBytes[i]>>1)&1;
+			stegoBits[(i*8)+7] = (dirtyStegoBytes[i])&1;
+		}
+		
+		// embed
+		if (dirtyStegoBytes.length<maxCapacity) {
+			int n, r, g, b;
+			Color c;
+			for (int i=0; i<(int)(stegoBits.length/3); i++) {
+				n = randomInts[i];
+				c = new Color(pixelArray[n]);
+				
+				r = c.getRed();
+				if (stegoBits[i*3]==1) {
+					r |= 1;
+				}
+				else {
+					r &= ~(1);
+				}
+				
+				g = c.getGreen();
+				if (stegoBits[(i*3)+1]==1) {
+					g |= 1;
+				}
+				else {
+					g &= ~(1);
+				}
+				
+				b = c.getBlue();
+				if (stegoBits[(i*3)+2]==1) {
+					b |= 1;
+				}
+				else {
+					b &= ~(1);
+				}
+				
+				pixelArray[n] = new Color(r, g, b).getRGB();
+			}
+			
+			// write stuffs
+			stegoImage.setRGB(0, 0, width, height, pixelArray, 0, width);
+			lblCapacity.setText(maxCapacity+" bytes");
+			
+			return true;
+		}
+		else {
+			errorMessage = "Stego File melebihi kapasitas!\nKapasistas maksimum : " + maxCapacity + " bytes";
+			return false;
+		}
+	}
+	
+	private boolean standardDecode(BufferedImage stegoImage, String key) {
+		// tulis image hasil decode di coverImage
+		// tulis byte[] hasil decode di stegoFile
+		// tulis nama file di lblFileName.setText()
+		// return true kalo bisa di-decode, false kalo ga bisa
+		// kalo ga bisa di-decode, tulis juga errornya kenapa di errorMessage
+		
+		int width = stegoImage.getWidth();
+		int height = stegoImage.getHeight();
+		
+		// get pixel array
+		int[] pixelArray = new int[width*height];
+		stegoImage.getRGB(0, 0, width, height, pixelArray, 0, width);
+		
+		// get random number generator
+		int seed = 0;
+		for  (int i=0; i<key.length(); i++) {
+			seed += (int)key.charAt(i);
+		}
+		seed = seed % (width*height);
+		Random rand = new Random(seed);
+		Integer[] randomInts = new Integer[width*height];
+	    for (int i = 0; i < randomInts.length; i++) {
+	    	randomInts[i] = i;
+	    }
+	    Collections.shuffle(Arrays.asList(randomInts), rand);
+		
+		// extract bits
+		int[] stegoBits = new int[width*height*3];
+		int n, r, g, b;
+		Color c;
+		for (int i=0; i<(width*height); i++) {
+			n = randomInts[i];
+			c = new Color(pixelArray[n]);
+			r = c.getRed();
+			stegoBits[i*3] = r&1;
+			g = c.getGreen();
+			stegoBits[(i*3)+1] = g&1;
+			b = c.getBlue();
+			stegoBits[(i*3)+2] = b&1;
+		}
+		
+		// convert to bytes, decrypt
+		byte[] dirtyStegoBytes = new byte[(int)stegoBits.length/8];
+		for (int i=0; i<dirtyStegoBytes.length; i++) {
+			for (int j=0; j<8; j++) {
+				if (stegoBits[(i*8)+j]==1) { // bit==1
+					dirtyStegoBytes[i] |= (1 << (7-j));
+				}
+				else {						// bit==0
+					dirtyStegoBytes[i] &= ~(1 << (7-j));
+				}
+			}
+		}
+		dirtyStegoBytes = decryptVigenere(dirtyStegoBytes, key);
+		
+		// extract properties
+		String dirtyStegoString = new String(dirtyStegoBytes, StandardCharsets.UTF_8);
+		System.out.println(dirtyStegoString);
+		int firstFound = dirtyStegoString.indexOf('#');
+		String fileName = dirtyStegoString.substring(0, firstFound);
+		int bytesLength = Integer.parseInt(dirtyStegoString.substring(firstFound+1, dirtyStegoString.indexOf('#', firstFound+1)));
+		
+		// get clean stegobytes
+		byte[] fileProp = (fileName+"#"+Integer.toString(bytesLength)+"#").getBytes(StandardCharsets.UTF_8);
+		byte[] stegoBytes = new byte[bytesLength];
+		System.arraycopy(dirtyStegoBytes, fileProp.length, stegoBytes, 0, bytesLength);
+		
+		// write stuffs
+		coverImage = stegoImage;
+		lblFileName.setText(fileName);
+		stegoFile = stegoBytes;
+		
+		return true;
+	}
+	
+	private boolean xinLiaoEncode(BufferedImage coverImage, byte[] stegoBytes, String key, String fileName) {
+		// tulis image hasil encode di stegoImage
+		// tulis max capacity di lblCapacity.setText(text)
+		// return true kalo bisa di-encode, false kalo ga bisa
+		// kalo ga bisa di encode, tulis juga errornya kenapa di errorMessage
+		
+		System.out.println("Encode!");
+		
+		for(int i=0;i<coverImage.getWidth();i++){
+			for(int j=0;j<coverImage.getHeight();j++){
+				Color color = new Color(coverImage.getRGB(i, j));
+				System.out.println(color.getRed() + " " + color.getBlue() + " " + color.getBlue());
+			}
+		}
+		
+		
 		return false;
 	}
 	
@@ -315,22 +503,12 @@ public class Steganography {
 		return d;
 	}
 	
-	private boolean xinLiaoEncode(BufferedImage coverImage, byte[] stegoBytes, String key, String fileName) {
-		// tulis image hasil encode di stegoImage
-		// tulis max capacity di lblCapacity.setText(text)
-		// return true kalo bisa di-encode, false kalo ga bisa
-		// kalo ga bisa di encode, tulis juga errornya kenapa di errorMessage
-		
-		System.out.println("Encode!");
-		
-		for(int i=0;i<coverImage.getWidth();i++){
-			for(int j=0;j<coverImage.getHeight();j++){
-				Color color = new Color(coverImage.getRGB(i, j));
-				System.out.println(color.getRed() + " " + color.getBlue() + " " + color.getBlue());
-			}
-		}
-		
-		
+	private boolean xinLiaoDecode(BufferedImage stegoImage, String key) {
+		// tulis image hasil decode di coverImage
+		// tulis byte[] hasil decode di stegoFile
+		// tulis nama file di lblFileName.setText()
+		// return true kalo bisa di-decode, false kalo ga bisa
+		// kalo ga bisa di-decode, tulis juga errornya kenapa di errorMessage
 		return false;
 	}
 	
@@ -339,24 +517,6 @@ public class Steganography {
 		// tulis max capacity di lblCapacity.setText(text)
 		// return true kalo bisa di-encode, false kalo ga bisa
 		// kalo ga bisa di-encode, tulis juga errornya kenapa di errorMessage
-		return false;
-	}
-	
-	private boolean standardDecode(BufferedImage stegoImage, String key) {
-		// tulis image hasil decode di coverImage
-		// tulis byte[] hasil decode di stegoFile
-		// tulis nama file di lblFileName.setText()
-		// return true kalo bisa di-decode, false kalo ga bisa
-		// kalo ga bisa di-decode, tulis juga errornya kenapa di errorMessage
-		return false;
-	}
-	
-	private boolean xinLiaoDecode(BufferedImage stegoImage, String key) {
-		// tulis image hasil decode di coverImage
-		// tulis byte[] hasil decode di stegoFile
-		// tulis nama file di lblFileName.setText()
-		// return true kalo bisa di-decode, false kalo ga bisa
-		// kalo ga bisa di-decode, tulis juga errornya kenapa di errorMessage
 		return false;
 	}
 	
