@@ -296,8 +296,8 @@ public class Steganography {
 		// insert file properties, encrypt
 		byte[] fileProp = (fileName+"#"+Integer.toString(stegoBytes.length)+"#").getBytes(StandardCharsets.UTF_8);
 		byte[] dirtyStegoBytes = Arrays.copyOf(fileProp, fileProp.length+stegoBytes.length);
-		System.arraycopy(stegoFile, 0, dirtyStegoBytes, fileProp.length, stegoBytes.length);
-		String dirtyStegoString = new String(dirtyStegoBytes, StandardCharsets.UTF_8);
+		System.arraycopy(stegoBytes, 0, dirtyStegoBytes, fileProp.length, stegoBytes.length);
+		//String dirtyStegoString = new String(dirtyStegoBytes, StandardCharsets.UTF_8);
 		//System.out.println(dirtyStegoString);
 		dirtyStegoBytes = encryptVigenere(dirtyStegoBytes, key);
 		
@@ -380,7 +380,7 @@ public class Steganography {
 					b &= ~(1);
 				}
 
-				System.out.println(n+" "+stegoBits[i*3]+" "+stegoBits[(i*3)+1]+" "+stegoBits[(i*3)+2]);
+				//System.out.println(n+" "+stegoBits[i*3]+" "+stegoBits[(i*3)+1]+" "+stegoBits[(i*3)+2]);
 				
 				pixelArray[n] = new Color(r, g, b).getRGB();
 			}
