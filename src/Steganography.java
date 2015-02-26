@@ -213,6 +213,78 @@ public class Steganography {
 		}); 
 	}
 	
+	private float getThreshold(){
+		return 6;
+	}
+	
+	private int getMinPixel(Color pixels[], int layer){
+		int ch[] = getBlockLayer(pixels, layer);
+		
+		int ymin = ch[0];
+		for(int i=1;i<4;i++){
+			if(ch[i] < ymin){
+				ymin = ch[i];
+			}
+		}
+		
+		return ymin;
+	}
+	
+	private int getMaxPixel(Color pixels[], int layer){
+		int ch[] = getBlockLayer(pixels, layer);
+		
+		int ymax = ch[0];
+		for(int i=1;i<4;i++){
+			if(ch[i] > ymax){
+				ymax = ch[i];
+			}
+		}
+		
+		return ymax;
+	}
+	
+	//layer 0,1,2: r,g,b
+	private int[] getBlockLayer(Color pixels[], int layer){
+		int ch[] = new int[4];
+		for(int i=0;i<4;i++){
+			if(layer == 0){
+				ch[i] = pixels[i].getRed();
+			} else if(layer == 1){
+				ch[i] = pixels[i].getBlue();
+			} else if(layer == 2){
+				ch[i] = pixels[i].getGreen();
+			} 
+		}
+		return ch;
+	}
+	
+	
+	private float getAvgDiff(Color[] pixels, int layer){
+		
+		int ch[] = getBlockLayer(pixels, layer);
+		int ymin = getMinPixel(pixels, layer);
+		
+		float result = 0f;
+		for(int i=0;i<4;i++){
+			result += (ch[i] - ymin);
+		}
+		
+		result /= 3;
+		
+		return result;
+	}
+	
+	private boolean isErrorBlock(Color[] pixels, int layer){
+		float D = getAvgDiff(pixels, layer);
+		float T = getThreshold();
+		int ymax = getMaxPixel(pixels, layer);
+		int ymin = getMinPixel(pixels, layer);
+		
+		if(D <= T && ((ymax - ymin) > 2*T + 2))
+			return true;	
+		return false;
+	}
+	
 	private void encode() {
 		System.out.println("Test");
 		boolean success = false;
@@ -295,25 +367,6 @@ public class Steganography {
 		return false;
 	}
 	
-	//isinya y0-y3
-	private float avgDiffValue(int[] y){
-		int ymin = y[0];
-		for(int i=1;i<4;i++){
-			if(y[i] < ymin){
-				ymin = y[i];
-			}
-		}
-		
-		float d = 0;
-		
-		for(int i=0;i<4;i++){
-			d += (y[i] - ymin);
-		}
-		
-		d /= 3;
-		
-		return d;
-	}
 	
 	private boolean xinLiaoEncode(BufferedImage coverImage, byte[] stegoBytes, String key, String fileName) {
 		// tulis image hasil encode di stegoImage
@@ -321,14 +374,29 @@ public class Steganography {
 		// return true kalo bisa di-encode, false kalo ga bisa
 		// kalo ga bisa di encode, tulis juga errornya kenapa di errorMessage
 		
-		System.out.println("Encode!");
 		
-		for(int i=0;i<coverImage.getWidth();i++){
-			for(int j=0;j<coverImage.getHeight();j++){
-				Color color = new Color(coverImage.getRGB(i, j));
-				System.out.println(color.getRed() + " " + color.getBlue() + " " + color.getBlue());
+		
+		/*
+		for(int i=0;i<coverImage.getHeight();i++){
+			for(int j=0;j<coverImage.getWidth();j += 2){
+				Color pixels[] = new Color[4];
+				
+				if(j + 1 < coverImage.getWidth() && i + 1 < coverImage.getHeight()){
+					pixels[0] = new Color(coverImage.getRGB(j, i));
+					pixels[1] = new Color(coverImage.getRGB(j+1, i));
+					pixels[2] = new Color(coverImage.getRGB(j, i+1));
+					pixels[3] = new Color(coverImage.getRGB(j+1, i+1));
+				}
+				
+				//for each layer: R, G, B
+				for(int k=0;k<3;k++){
+					if(!isErrorBlock(pixels, k)){
+						//embed
+						
+					}
+				}
 			}
-		}
+		}*/
 		
 		
 		return false;
