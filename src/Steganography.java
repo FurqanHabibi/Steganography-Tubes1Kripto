@@ -98,7 +98,7 @@ public class Steganography {
 					File file = imageChooser.getSelectedFile();
 					try {
 						coverImage = ImageIO.read(file);
-						stegoImage = coverImage;
+						stegoImage = ImageIO.read(file);
 					} catch (IOException e1) {
 						// TODO Auto-generated catch block
 						e1.printStackTrace();
@@ -126,7 +126,7 @@ public class Steganography {
 					File file = imageChooser.getSelectedFile();
 					try {
 						stegoImage = ImageIO.read(file);
-						coverImage = stegoImage;
+						coverImage = ImageIO.read(file);
 					} catch (IOException e1) {
 						// TODO Auto-generated catch block
 						e1.printStackTrace();
@@ -197,7 +197,7 @@ public class Steganography {
 		lblStegoImage.addMouseListener(new MouseAdapter() {
 		    public void mouseClicked(MouseEvent e)	{
 		    	if (stegoImage!=null) {
-			    	JFrame frame1 = new JFrame("Cover Image");
+			    	JFrame frame1 = new JFrame("Stego Image");
 			    	frame1.setBounds(0, 0, 640, 720);
 			    	frame1.setLocationRelativeTo(lblStegoImage);
 			    	JPanel contentPane = new JPanel();
@@ -228,7 +228,6 @@ public class Steganography {
 			errorMessage = "Key belum dimasukkan!";
 		}
 		else {
-			//System.out.println(comboBox.getSelectedItem().toString());
 			if (comboBox.getSelectedItem().toString().equals("LSB Standard")) {
 				success = standardEncode(coverImage, stegoFile, txtKey.getText(), lblFileName.getText());
 			}
