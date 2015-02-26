@@ -62,8 +62,6 @@ public class Steganography {
 	private BufferedImage stegoImage;
 	private byte[] stegoFile;
 	private String errorMessage;
-	
-	private byte[] dirtyStegoFile;
 	/**
 	 * Launch the application.
 	 */
@@ -279,13 +277,13 @@ public class Steganography {
 		else {
 			String key = txtKey.getText();
 			if (comboBox.getSelectedItem().toString().equals("LSB Standard")) {
-				success = standardDecode(coverImage, key);
+				success = standardDecode(stegoImage, key);
 			}
 			else if (comboBox.getSelectedItem().toString().equals("LSB Xin Liao")) {
-				success = xinLiaoDecode(coverImage, key);
+				success = xinLiaoDecode(stegoImage, key);
 			}
 			else { // comboBox.getSelectedItem().toString().equals("LSB Gandharba Swain")
-				success = gandharbaDecode(coverImage, key);
+				success = gandharbaDecode(stegoImage, key);
 			}
 		}
 		if (!success) {
@@ -316,11 +314,13 @@ public class Steganography {
 		byte[] fileProp = (fileName+"#"+Integer.toString(stegoBytes.length)+"#").getBytes(StandardCharsets.UTF_8);
 		byte[] dirtyStegoBytes = Arrays.copyOf(fileProp, fileProp.length+stegoBytes.length);
 		System.arraycopy(stegoFile, 0, dirtyStegoBytes, fileProp.length, stegoBytes.length);
+		String dirtyStegoString = new String(dirtyStegoBytes, StandardCharsets.UTF_8);
+		//System.out.println(dirtyStegoString);
 		dirtyStegoBytes = encryptVigenere(dirtyStegoBytes, key);
 		
 		// calculate capacity
 		int width = coverImage.getWidth();
-		int height = coverImage.getWidth();
+		int height = coverImage.getHeight();
 		int maxCapacity = (width*height*3)/8;
 		
 		// get pixel array
@@ -335,10 +335,17 @@ public class Steganography {
 		seed = seed % (width*height);
 		Random rand = new Random(seed);
 		Integer[] randomInts = new Integer[width*height];
+//		System.out.println("seed : "+seed+" length : "+randomInts.length);
 	    for (int i = 0; i < randomInts.length; i++) {
 	    	randomInts[i] = i;
 	    }
+//	    for (int i = 0; i < 10; i++) {
+//	    	System.out.println(randomInts[i]);
+//	    }
 	    Collections.shuffle(Arrays.asList(randomInts), rand);
+//	    for (int i = 0; i < 10; i++) {
+//	    	System.out.println(randomInts[i]);
+//	    }
 		
 		// convert bytes to bits
 	    int stegoBitsLength = dirtyStegoBytes.length*8;
@@ -389,6 +396,8 @@ public class Steganography {
 				else {
 					b &= ~(1);
 				}
+
+				System.out.println(n+" "+stegoBits[i*3]+" "+stegoBits[(i*3)+1]+" "+stegoBits[(i*3)+2]);
 				
 				pixelArray[n] = new Color(r, g, b).getRGB();
 			}
@@ -427,10 +436,17 @@ public class Steganography {
 		seed = seed % (width*height);
 		Random rand = new Random(seed);
 		Integer[] randomInts = new Integer[width*height];
+//		System.out.println("seed : "+seed+" length : "+randomInts.length);
 	    for (int i = 0; i < randomInts.length; i++) {
 	    	randomInts[i] = i;
 	    }
+//	    for (int i = 0; i < 10; i++) {
+//	    	System.out.println(randomInts[i]);
+//	    }
 	    Collections.shuffle(Arrays.asList(randomInts), rand);
+//	    for (int i = 0; i < 10; i++) {
+//	    	System.out.println(randomInts[i]);
+//	    }
 		
 		// extract bits
 		int[] stegoBits = new int[width*height*3];
@@ -445,6 +461,9 @@ public class Steganography {
 			stegoBits[(i*3)+1] = g&1;
 			b = c.getBlue();
 			stegoBits[(i*3)+2] = b&1;
+//			if (i<10) {
+//				System.out.println("############"+n+" "+stegoBits[i*3]+" "+stegoBits[(i*3)+1]+" "+stegoBits[(i*3)+2]);
+//			}
 		}
 		
 		// convert to bytes, decrypt
@@ -463,9 +482,10 @@ public class Steganography {
 		
 		// extract properties
 		String dirtyStegoString = new String(dirtyStegoBytes, StandardCharsets.UTF_8);
-		System.out.println(dirtyStegoString);
+		//System.out.println("###################\n"+dirtyStegoString);
 		int firstFound = dirtyStegoString.indexOf('#');
 		String fileName = dirtyStegoString.substring(0, firstFound);
+		//System.out.println("nama : "+fileName);
 		int bytesLength = Integer.parseInt(dirtyStegoString.substring(firstFound+1, dirtyStegoString.indexOf('#', firstFound+1)));
 		
 		// get clean stegobytes
