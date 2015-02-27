@@ -551,9 +551,9 @@ public class Steganography {
 			if(layer == 0){
 				ch[i] = pixels[i].getRed();
 			} else if(layer == 1){
-				ch[i] = pixels[i].getBlue();
-			} else if(layer == 2){
 				ch[i] = pixels[i].getGreen();
+			} else if(layer == 2){
+				ch[i] = pixels[i].getBlue();
 			} 
 		}
 		return ch;
@@ -602,6 +602,14 @@ public class Steganography {
 			
 		}
 		return pixel;
+	}
+	
+	private int[] getEmbeddedPixel(int pixel, int k){
+		int[] bits = new int[k];
+		for(int i=0;i<k;i++){
+			bits[i] = (pixel >> k) & 1;
+		}
+		return bits;
 	}
 	
 	// k bit is embedded into the origin pixel, resulting in LSB pixel.
@@ -704,10 +712,15 @@ public class Steganography {
 		
 		System.arraycopy(stegoBytes, 0, embeddedStegoBytes, header.length, stegoBytes.length);
 		embeddedStegoBytes = encryptVigenere(embeddedStegoBytes, key);
+
+		String resultString = new String(embeddedStegoBytes, StandardCharsets.UTF_8);
+		System.out.println("result string: " + resultString); System.out.println("\n\n\n\n");
 		
 		// convert bytes to bits
 	    int stegoBitsLength = embeddedStegoBytes.length * 8;
 		int[] embeddedStegoBits = new int[stegoBitsLength];
+		int maxCapacity = coverImage.getWidth() * coverImage.getHeight() * 8;
+		
 		for (int i=0; i<embeddedStegoBits.length; i++) {
 			embeddedStegoBits[i] = 0;
 		}
@@ -722,88 +735,95 @@ public class Steganography {
 			embeddedStegoBits[(i*8)+7] = (embeddedStegoBytes[i])&1;
 		}
 		
-		int embeddedBitIndex = 0;
-		for(int i=0;i<coverImage.getHeight();i += 2){
-			for(int j=0;j<coverImage.getWidth();j += 2){
-				Color pixels[] = new Color[4];
-				
-				if(j + 1 < coverImage.getWidth() && i + 1 < coverImage.getHeight()){
-					//System.out.println("Processing " + j + " " + i);
-					pixels[0] = new Color(coverImage.getRGB(j, i));
-					pixels[1] = new Color(coverImage.getRGB(j+1, i));
-					pixels[2] = new Color(coverImage.getRGB(j, i+1));
-					pixels[3] = new Color(coverImage.getRGB(j+1, i+1));
+		if(stegoBitsLength <= maxCapacity){
+			int embeddedBitIndex = 0;
+			int embedCount = 0;
+			for(int i=0;i<coverImage.getHeight();i += 2){
+				for(int j=0;j<coverImage.getWidth();j += 2){
+					Color pixels[] = new Color[4];
 					
-					/*
-					for(int z=0;z<4;z++){
-						System.out.println(pixels[z].getRed() + " " + pixels[z].getGreen() + " " + pixels[z].getBlue());
-					}
-					System.out.println(); */
-					
-					//for each layer: R, G, B & which pixel left top, right top, left bottom, right bottom
-					int[][] embeddedLayerPixels = new int[3][4];
-					for(int k=0;k<3;k++){				
-						// default if error block
-						for(int m=0;m<4;m++){
-							embeddedLayerPixels[k][m] = getBlockLayer(pixels, k)[m];
-						}
+					if(j + 1 < coverImage.getWidth() && i + 1 < coverImage.getHeight()){
+						//System.out.println("Processing " + j + " " + i);
+						pixels[0] = new Color(coverImage.getRGB(j, i));
+						pixels[1] = new Color(coverImage.getRGB(j+1, i));
+						pixels[2] = new Color(coverImage.getRGB(j, i+1));
+						pixels[3] = new Color(coverImage.getRGB(j+1, i+1));
 						
-						// not an error block and there is something left to embed
-						if(!isErrorBlock(pixels, k) && embeddedBitIndex < stegoBitsLength){
-							// embed
-							// use low k
-							if(getAvgDiff(pixels, k) < getThreshold()){
-								for(int m=0;m<4;m++){
-									int[] embed = new int[getLowK()];
-									for(int n=embeddedBitIndex;n<embeddedBitIndex+getLowK();n++){
-										embed[n-embeddedBitIndex] = embeddedStegoBits[embeddedBitIndex];
+						/*
+						for(int z=0;z<4;z++){
+							System.out.println(pixels[z].getRed() + " " + pixels[z].getGreen() + " " + pixels[z].getBlue());
+						}
+						System.out.println(); */
+						
+						//for each layer: R, G, B & which pixel left top, right top, left bottom, right bottom
+						int[][] embeddedLayerPixels = new int[3][4];
+						for(int k=0;k<3;k++){				
+							// default if error block
+							for(int m=0;m<4;m++){
+								embeddedLayerPixels[k][m] = getBlockLayer(pixels, k)[m];
+							}
+							
+							// not an error block and there is something left to embed
+							if(!isErrorBlock(pixels, k) && embeddedBitIndex < stegoBitsLength){
+								embedCount++;
+								// embed
+								// use low k
+								if(getAvgDiff(pixels, k) <= getThreshold()){
+									for(int m=0;m<4;m++){
+										int[] embed = new int[getLowK()];
+										for(int n=embeddedBitIndex;n<embeddedBitIndex+getLowK();n++){
+											embed[n-embeddedBitIndex] = embeddedStegoBits[embeddedBitIndex];
+										}
+										embeddedBitIndex += getLowK();
+										embeddedLayerPixels[k][m] = setEmbeddedPixel(getBlockLayer(pixels, k)[m], embed, getLowK());
+										
+										// apply modified LSB subtitution method
+										embeddedLayerPixels[k][m] = getModifiedPixel(embeddedLayerPixels[k][m], getBlockLayer(pixels, k)[m], getLowK());
 									}
-									embeddedBitIndex += getLowK();
-									embeddedLayerPixels[k][m] = setEmbeddedPixel(getBlockLayer(pixels, k)[m], embed, getLowK());
 									
-									// apply modified LSB subtitution method
-									embeddedLayerPixels[k][m] = getModifiedPixel(embeddedLayerPixels[k][m], getBlockLayer(pixels, k)[m], getLowK());
-								}
-								
-								// readjust
-								embeddedLayerPixels[k] = readjustPixelLayer(embeddedLayerPixels[k], getLowK());
-							} else { // use high k
-								for(int m=0;m<4;m++){
-									int[] embed = new int[getHighK()];
-									for(int n=embeddedBitIndex;n<embeddedBitIndex+getHighK();n++){
-										embed[n-embeddedBitIndex] = embeddedStegoBits[embeddedBitIndex];
+									// readjust
+									embeddedLayerPixels[k] = readjustPixelLayer(embeddedLayerPixels[k], getLowK());
+								} else { // use high k
+									for(int m=0;m<4;m++){
+										int[] embed = new int[getHighK()];
+										for(int n=embeddedBitIndex;n<embeddedBitIndex+getHighK();n++){
+											embed[n-embeddedBitIndex] = embeddedStegoBits[embeddedBitIndex];
+										}
+										embeddedBitIndex += getHighK();
+										embeddedLayerPixels[k][m] = setEmbeddedPixel(getBlockLayer(pixels, k)[m], embed, getHighK());
+										
+										// apply modified LSB subtitution method
+										embeddedLayerPixels[k][m] = getModifiedPixel(embeddedLayerPixels[k][m], getBlockLayer(pixels, k)[m], getHighK());
 									}
-									embeddedBitIndex += getHighK();
-									embeddedLayerPixels[k][m] = setEmbeddedPixel(getBlockLayer(pixels, k)[m], embed, getHighK());
-									
-									// apply modified LSB subtitution method
-									embeddedLayerPixels[k][m] = getModifiedPixel(embeddedLayerPixels[k][m], getBlockLayer(pixels, k)[m], getHighK());
+																
+									// readjust
+									embeddedLayerPixels[k] = readjustPixelLayer(embeddedLayerPixels[k], getHighK());
 								}
-															
-								// readjust
-								embeddedLayerPixels[k] = readjustPixelLayer(embeddedLayerPixels[k], getHighK());
 							}
 						}
-					}
-					
-					// put into stego images
-					// for each pixel, create RGB value
-					
-					int posX[] = new int[]{j,j+1,j,j+1};
-					int posY[] = new int[]{i,i,i+1,i+1};
-					
-					for(int m=0;m<4;m++){
-						Color pixel = new Color(embeddedLayerPixels[0][m], embeddedLayerPixels[1][m], embeddedLayerPixels[2][m]);
-						stegoImage.setRGB(posX[m], posY[m], pixel.getRGB());
-					}
-					
-				} else {
-					
-				}				
+						
+						// put into stego images
+						// for each pixel, create RGB value
+						
+						int posX[] = new int[]{j,j+1,j,j+1};
+						int posY[] = new int[]{i,i,i+1,i+1};
+						
+						for(int m=0;m<4;m++){
+							Color pixel = new Color(embeddedLayerPixels[0][m], embeddedLayerPixels[1][m], embeddedLayerPixels[2][m]);
+							stegoImage.setRGB(posX[m], posY[m], pixel.getRGB());
+						}
+						
+					} else {
+						
+					}				
+				}
 			}
+			
+			return true;
+		} else {
+			errorMessage = "Stego File melebihi kapasitas!\nKapasistas maksimum : " + maxCapacity + " bytes";
+			return false;
 		}
-		
-		return true;
 	}
 	
 	//isinya y0-y3
@@ -832,7 +852,85 @@ public class Steganography {
 		// tulis nama file di lblFileName.setText()
 		// return true kalo bisa di-decode, false kalo ga bisa
 		// kalo ga bisa di-decode, tulis juga errornya kenapa di errorMessage
-		return false;
+		
+		//for each layer: R, G, B & which pixel left top, right top, left bottom, right bottom
+		int[] resultBits = new int[255 * 8];
+		byte[] result = new byte[255 * 8]; //max possible embedded message
+		int resultBitIndex = 0;
+		
+		for(int i=0;i<coverImage.getHeight();i += 2){
+			for(int j=0;j<coverImage.getWidth();j += 2){
+				Color pixels[] = new Color[4];
+				
+				if(j + 1 < coverImage.getWidth() && i + 1 < coverImage.getHeight()){
+					//System.out.println("Processing " + j + " " + i);
+					pixels[0] = new Color(coverImage.getRGB(j, i));
+					pixels[1] = new Color(coverImage.getRGB(j+1, i));
+					pixels[2] = new Color(coverImage.getRGB(j, i+1));
+					pixels[3] = new Color(coverImage.getRGB(j+1, i+1));
+
+					for(int k=0;k<3;k++){		
+						float D = getAvgDiff(pixels, k);
+						if(D <= getThreshold()){
+							if(!isErrorBlock(pixels, k)){
+								for(int m=0;m<4;m++){
+									int bits[] = new int[getLowK()];
+									bits = getEmbeddedPixel(getBlockLayer(pixels, k)[m], getLowK());
+									for(int n=0;n<getLowK();n++){
+										resultBits[resultBitIndex++] = bits[n];
+									}
+								}
+							}
+						} else {
+							if(!isErrorBlock(pixels, k)){
+								for(int m=0;m<4;m++){
+									int bits[] = new int[getHighK()];
+									bits = getEmbeddedPixel(getBlockLayer(pixels, k)[m], getHighK());
+									for(int n=0;n<getHighK();n++){
+										resultBits[resultBitIndex++] = bits[n];
+									}
+								}
+							}
+						}
+					}
+					
+				}
+			}
+		}
+		
+		// convert to bytes, decrypt
+		for (int i=0; i<result.length; i++) {
+			for (int j=0; j<8; j++) {
+				if (resultBits[(i*8)+j]==1) { // bit==1
+					result[i] |= (1 << (7-j));
+				}
+				else {						// bit==0
+					result[i] &= ~(1 << (7-j));
+				}
+			}
+		}
+		
+		result = decryptVigenere(result, key);
+		
+		// extract properties
+		String resultString = new String(result, StandardCharsets.UTF_8);
+		System.out.println("result string: " + resultString);
+		int firstFound = resultString.indexOf('#');
+		String fileName = resultString.substring(0, firstFound);
+		System.out.println("nama : "+ fileName);
+		int bytesLength = Integer.parseInt(resultString.substring(firstFound+1, resultString.indexOf('#', firstFound+1)));
+		
+		// get clean stegobytes
+		byte[] fileProp = (fileName+"#"+Integer.toString(bytesLength)+"#").getBytes(StandardCharsets.UTF_8);
+		byte[] stegoBytes = new byte[bytesLength];
+		System.arraycopy(result, fileProp.length, stegoBytes, 0, bytesLength);
+		
+		// write stuffs
+		coverImage = stegoImage;
+		lblFileName.setText(fileName);
+		stegoFile = stegoBytes;
+		
+		return true;
 	}
 	
 	private boolean gandharbaEncode(BufferedImage coverImage, byte[] stegoBytes, String key, String fileName) {
