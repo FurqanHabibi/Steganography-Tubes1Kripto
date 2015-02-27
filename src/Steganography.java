@@ -86,7 +86,7 @@ public class Steganography {
 		
 		// set file choosers
 		imageChooser = new JFileChooser();
-		FileNameExtensionFilter imageFilter = new FileNameExtensionFilter("PNG Files", "png");
+		FileNameExtensionFilter imageFilter = new FileNameExtensionFilter("PNG & BMP Files", "png", "bmp");
 		imageChooser.setFileFilter(imageFilter);
 		fileChooser = new JFileChooser();
 		fileChooser.setDialogTitle("Stego File");
@@ -98,7 +98,7 @@ public class Steganography {
 					File file = imageChooser.getSelectedFile();
 					try {
 						coverImage = ImageIO.read(file);
-						stegoImage = ImageIO.read(file);
+						stegoImage = new BufferedImage(coverImage.getWidth(), coverImage.getHeight(), BufferedImage.TYPE_INT_ARGB);
 					} catch (IOException e1) {
 						// TODO Auto-generated catch block
 						e1.printStackTrace();
@@ -126,7 +126,7 @@ public class Steganography {
 					File file = imageChooser.getSelectedFile();
 					try {
 						stegoImage = ImageIO.read(file);
-						coverImage = ImageIO.read(file);
+						coverImage = new BufferedImage(stegoImage.getWidth(), stegoImage.getHeight(), BufferedImage.TYPE_INT_ARGB);
 					} catch (IOException e1) {
 						// TODO Auto-generated catch block
 						e1.printStackTrace();
@@ -260,7 +260,13 @@ public class Steganography {
 		}
 		else {
 			lblStegoImage.setIcon(new ImageIcon(scaleImage(stegoImage, lblStegoImage.getWidth(), lblStegoImage.getHeight())));
-			// calculate psnr
+//			int[] pixelArray = new int[stegoImage.getWidth()*stegoImage.getHeight()];
+//			Color c = Color.BLACK;
+//			for (int i=0; i<pixelArray.length; i++) {
+//				pixelArray[i] = c.getRGB();
+//			}
+//			stegoImage.setRGB(0, 0, stegoImage.getWidth(), stegoImage.getHeight(), pixelArray, 0, stegoImage.getWidth());
+			lblPsnrValue.setText(PSNR(coverImage, stegoImage)+"");
 		}
 	}
 	
@@ -1105,7 +1111,7 @@ public class Steganography {
 		return plaintext;
 	}
 	
-	public Image scaleImage(BufferedImage bi, int width, int height) {
+	private Image scaleImage(BufferedImage bi, int width, int height) {
         int newWidth = bi.getWidth();
         int newHeight = bi.getHeight();
         if (bi.getWidth() > width) {
@@ -1117,6 +1123,29 @@ public class Steganography {
             newWidth = (newHeight * bi.getWidth()) / bi.getHeight();
         }
 		return bi.getScaledInstance(newWidth, newHeight, Image.SCALE_SMOOTH);
+	}
+	
+	private double PSNR (BufferedImage coverImage, BufferedImage stegoImage) {
+		int width = coverImage.getWidth();
+		int height = coverImage.getHeight();
+		int[] pixelArrayCover = new int[width*height];
+		coverImage.getRGB(0, 0, width, height, pixelArrayCover, 0, width);
+		int[] pixelArrayStego = new int[width*height];
+		stegoImage.getRGB(0, 0, width, height, pixelArrayStego, 0, width);
+		
+		double red = 0;
+		double green = 0;
+		double blue = 0;
+		Color c1, c2;
+		for (int i=0; i<width*height; i++) {
+			c1 = new Color (pixelArrayCover[i]);
+			c2 = new Color (pixelArrayStego[i]);
+			red += Math.pow((c1.getRed() - c2.getRed()), 2);
+			green += Math.pow((c1.getGreen() - c2.getGreen()), 2);
+			blue += Math.pow((c1.getBlue() - c2.getBlue()), 2);
+		}
+		double rms = (red+green+blue)/(width*height*3);
+		return (10 * (Math.log10(Math.pow(255, 2)/rms)));
 	}
 	
 	
