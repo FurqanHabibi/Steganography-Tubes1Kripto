@@ -11,6 +11,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Random;
@@ -37,7 +38,7 @@ import javax.swing.border.EtchedBorder;
 import javax.swing.border.TitledBorder;
 import javax.swing.filechooser.FileNameExtensionFilter;
 
-
+import StegoClass.GandharbaStegano;
 public class Steganography {
 
 	private JFrame frame;
@@ -62,6 +63,8 @@ public class Steganography {
 	private BufferedImage stegoImage;
 	private byte[] stegoFile;
 	private String errorMessage;
+	
+	private GandharbaStegano GGS;
 	/**
 	 * Launch the application.
 	 */
@@ -86,7 +89,8 @@ public class Steganography {
 		
 		// set file choosers
 		imageChooser = new JFileChooser();
-		FileNameExtensionFilter imageFilter = new FileNameExtensionFilter("PNG & BMP Files", "png", "bmp");
+		String[] Ext = {"bmp"};
+		FileNameExtensionFilter imageFilter = new FileNameExtensionFilter("PNG & BMP Files", Ext);
 		imageChooser.setFileFilter(imageFilter);
 		fileChooser = new JFileChooser();
 		fileChooser.setDialogTitle("Stego File");
@@ -299,7 +303,8 @@ public class Steganography {
 			if (fileChooser.showSaveDialog(frame) == JFileChooser.APPROVE_OPTION) {
 				File file = fileChooser.getSelectedFile();
 				try {
-					Files.write(file.toPath(), stegoFile);
+					StandardOpenOption[] Opt = {StandardOpenOption.CREATE_NEW};
+					Files.write(file.toPath(), stegoFile,Opt);
 				} catch (IOException e1) {
 					// TODO Auto-generated catch block
 					e1.printStackTrace();
@@ -342,7 +347,7 @@ public class Steganography {
 		Integer[] randomInts = new Integer[width*height];
 //		System.out.println("seed : "+seed+" length : "+randomInts.length);
 	    for (int i = 0; i < randomInts.length; i++) {
-	    	randomInts[i] = i;
+	    	randomInts[i] = Integer.valueOf(i);
 	    }
 //	    for (int i = 0; i < 10; i++) {
 //	    	System.out.println(randomInts[i]);
@@ -375,7 +380,7 @@ public class Steganography {
 			int n, r, g, b;
 			Color c;
 			for (int i=0; i<(int)(stegoBits.length/3); i++) {
-				n = randomInts[i];
+				n = randomInts[i].intValue();
 				c = new Color(pixelArray[n]);
 				
 				r = c.getRed();
@@ -443,7 +448,7 @@ public class Steganography {
 		Integer[] randomInts = new Integer[width*height];
 //		System.out.println("seed : "+seed+" length : "+randomInts.length);
 	    for (int i = 0; i < randomInts.length; i++) {
-	    	randomInts[i] = i;
+	    	randomInts[i] = Integer.valueOf(i);
 	    }
 //	    for (int i = 0; i < 10; i++) {
 //	    	System.out.println(randomInts[i]);
@@ -458,7 +463,7 @@ public class Steganography {
 		int n, r, g, b;
 		Color c;
 		for (int i=0; i<(width*height); i++) {
-			n = randomInts[i];
+			n = randomInts[i].intValue();
 			c = new Color(pixelArray[n]);
 			r = c.getRed();
 			stegoBits[i*3] = r&1;
@@ -938,7 +943,72 @@ public class Steganography {
 		// tulis max capacity di lblCapacity.setText(text)
 		// return true kalo bisa di-encode, false kalo ga bisa
 		// kalo ga bisa di-encode, tulis juga errornya kenapa di errorMessage
-		return false;
+		boolean ret=false;
+		GGS.ColorImage = true; //Color Image?
+		GGS.setImage(coverImage);
+		//sisipkan filename dan ukuran file
+		String FileInfo = fileName + "#"+ Integer.toString(stegoBytes.length)+"#";
+		byte[] NewStegoBytes = new byte[stegoBytes.length+FileInfo.length()];
+		System.arraycopy(FileInfo.getBytes(), 0, NewStegoBytes, 0, FileInfo.length());
+		
+		byte[] EncryptedBytes = encryptVigenere(stegoBytes,key);
+		System.arraycopy(EncryptedBytes,0,NewStegoBytes,FileInfo.length(),EncryptedBytes.length);
+		System.out.println("Full Message : "+new String(NewStegoBytes));
+		
+		if (GGS.ColorImage==false){
+			GGS.ImageData = GGS.processImage(GGS.img,false);
+			GGS.calculateCapacity(GGS.ImgWidth, GGS.ImgHeight, GGS.ImageData);
+			lblCapacity.setText(Integer.toString(GGS.ImgCapacity)+" (bits)");
+			//Generate Seed
+			int Seed = 0;
+			for(int i=0;i<key.length();i++){
+				Seed+=key.charAt(i);
+			}
+			ret = GGS.embedMessage(NewStegoBytes, Seed, GGS.ImageData, GGS.ImgWidth, GGS.ImgHeight);
+			int[] TempImageData = new int[GGS.StegoImageData.length];
+			this.stegoImage = new BufferedImage(GGS.ImgWidth,GGS.ImgHeight,BufferedImage.TYPE_INT_ARGB);
+			for(int i=0;i<GGS.StegoImageData.length;i++){
+				//System.out.println("TempImage : "+TempImageData[i]);
+				int row = i/256;
+				int col =i%256;
+				int temp = GGS.StegoImageData[i];
+				Color C = new Color(temp,temp,temp);
+				TempImageData[i]=C.getRGB();
+				this.stegoImage.setRGB(col,row,C.getRGB());
+				if (i==25768){
+					//System.out.println("Steg lagi : "+temp+" "+C.getRGB()+" "+this.stegoImage.getRGB(col,row));
+					
+				}
+			}
+			GGS.stegoimg = this.stegoImage;
+		}
+		else{
+			GGS.ColorImageData=GGS.processImage(GGS.img,true);
+			GGS.calculateCapacity(GGS.ImgWidth*3, GGS.ImgHeight, GGS.ColorImageData);
+			lblCapacity.setText(Integer.toString(GGS.ImgCapacity)+" (bits)");
+			//Generate Seed
+			int Seed = 0;
+			for(int i=0;i<key.length();i++){
+				Seed+=key.charAt(i);
+			}
+			ret = GGS.embedMessage(NewStegoBytes, Seed, GGS.ColorImageData, GGS.ImgWidth*3, GGS.ImgHeight);
+			this.stegoImage = new BufferedImage(GGS.ImgWidth,GGS.ImgHeight,BufferedImage.TYPE_INT_ARGB);
+			for(int i=0;i<GGS.ColorImageData.length/3;i++){
+				int idx = (i/GGS.ImgWidth)*(GGS.ImgWidth*3) + (i%GGS.ImgWidth);
+				int red =  GGS.ColorImageData[idx];
+				int green = GGS.ColorImageData[idx+GGS.ImgWidth];
+				int blue = GGS.ColorImageData[idx+GGS.ImgWidth*2];
+				
+				int row = i/GGS.ImgWidth;
+				int col =i%GGS.ImgWidth;
+				int temp = GGS.StegoImageData[i];
+				Color C = new Color(red,green,blue);
+				this.stegoImage.setRGB(col,row,C.getRGB());
+			}
+		
+			GGS.stegoimg = this.stegoImage;
+		}
+		return ret;
 	}
 	
 	private boolean gandharbaDecode(BufferedImage stegoImage, String key) {
@@ -947,7 +1017,41 @@ public class Steganography {
 		// tulis nama file di lblFileName.setText()
 		// return true kalo bisa di-decode, false kalo ga bisa
 		// kalo ga bisa di-decode, tulis juga errornya kenapa di errorMessage
-		return false;
+		GGS.ColorImage = true;
+		GGS.setStegoImage(stegoImage);
+		boolean ret = false;
+		int Seed = 0;
+		for(int i=0;i<key.length();i++){
+			Seed+=key.charAt(i);
+		}
+		if(GGS.ColorImage==false){
+			GGS.setStegoImage(GGS.stegoimg);
+			GGS.StegoImageData = GGS.processImage(GGS.stegoimg, false);
+			System.out.println("Coba Stego Image : "+GGS.StegoImageData[25768]);
+			ret=GGS.extractMessage(Seed, GGS.StegoImageData, GGS.ImgWidth, GGS.ImgHeight);
+			for(int i=0;i<GGS.MessageBytes.length;i++){
+				System.out.print((char)GGS.MessageBytes[i]);
+			}
+			this.lblFileName.setText(GGS.StegoFileName);
+			this.stegoFile = new byte[GGS.MessageBytes.length];
+			System.arraycopy(GGS.MessageBytes, 0, this.stegoFile, 0, GGS.MessageBytes.length);
+		}
+		else{
+			GGS.setStegoImage(GGS.stegoimg);
+			GGS.StegoImageData = GGS.processImage(GGS.stegoimg, true);
+			ret=GGS.extractMessage(Seed, GGS.StegoImageData, GGS.ImgWidth*3, GGS.ImgHeight);
+			GGS.MessageBytes = decryptVigenere(GGS.MessageBytes,key);
+			for(int i=0;i<GGS.MessageBytes.length;i++){
+				System.out.print((char)GGS.MessageBytes[i]);
+			}
+			this.lblFileName.setText(GGS.StegoFileName);
+			this.stegoFile = new byte[GGS.MessageBytes.length];
+			System.arraycopy(GGS.MessageBytes, 0, this.stegoFile, 0, GGS.MessageBytes.length);
+			for(int i=0;i<GGS.MessageBytes.length;i++){
+				System.out.print((char)stegoFile[i]);
+			}
+		}
+		return ret;
 	}
 	
 	private byte[] encryptVigenere(byte[] plaintext, String key) {
@@ -1029,6 +1133,8 @@ public class Steganography {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
+		
+		GGS = new GandharbaStegano();
 		
 		frame = new JFrame("Steganography");
 		frame.setBounds(0, 0, 1000, 650);
