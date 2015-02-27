@@ -86,7 +86,7 @@ public class Steganography {
 		
 		// set file choosers
 		imageChooser = new JFileChooser();
-		FileNameExtensionFilter imageFilter = new FileNameExtensionFilter("PNG Files", "png");
+		FileNameExtensionFilter imageFilter = new FileNameExtensionFilter("PNG & BMP Files", "png", "bmp");
 		imageChooser.setFileFilter(imageFilter);
 		fileChooser = new JFileChooser();
 		fileChooser.setDialogTitle("Stego File");
@@ -98,7 +98,7 @@ public class Steganography {
 					File file = imageChooser.getSelectedFile();
 					try {
 						coverImage = ImageIO.read(file);
-						stegoImage = ImageIO.read(file);
+						stegoImage = new BufferedImage(coverImage.getWidth(), coverImage.getHeight(), BufferedImage.TYPE_INT_ARGB);
 					} catch (IOException e1) {
 						// TODO Auto-generated catch block
 						e1.printStackTrace();
@@ -126,7 +126,7 @@ public class Steganography {
 					File file = imageChooser.getSelectedFile();
 					try {
 						stegoImage = ImageIO.read(file);
-						coverImage = ImageIO.read(file);
+						coverImage = new BufferedImage(stegoImage.getWidth(), stegoImage.getHeight(), BufferedImage.TYPE_INT_ARGB);
 					} catch (IOException e1) {
 						// TODO Auto-generated catch block
 						e1.printStackTrace();
