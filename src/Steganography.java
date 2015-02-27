@@ -11,6 +11,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Random;
@@ -247,7 +248,56 @@ public class Steganography {
 				colors[3] = new Color(164, 170, 95);
 				
 				System.out.println(getBlockLayer(colors, 0)[0]);
+				
+				
+				int[] block = new int[]{139, 146, 137, 142};
+				ArrayList<Integer> bits1, bits2, bits3, bits4;
+				
+				bits1 = new ArrayList<Integer>(Arrays.asList(0,0,0));
+				bits2 = new ArrayList<Integer>(Arrays.asList(1,1,1));
+				bits3 = new ArrayList<Integer>(Arrays.asList(1,1,1));
+				bits4 = new ArrayList<Integer>(Arrays.asList(1,0,1));
+				
+				float D = getAvgDiff(block);
+				
+				System.out.println("After embedding: " + Arrays.toString(block));
+				
+				System.out.println("D: " + D);
+				if(D > getThreshold()){
+					System.out.println("high level");
+					block[0] = setEmbeddedPixel(block[0], bits1, getHighK());
+					block[1] = setEmbeddedPixel(block[1], bits2, getHighK());
+					block[2] = setEmbeddedPixel(block[2], bits3, getHighK());
+					block[3] = setEmbeddedPixel(block[3], bits4, getHighK());
+					
+					System.out.println("After embedding: " + Arrays.toString(block));
+					
+					System.out.println("Bits before modif:");
+					System.out.println(Integer.toBinaryString(block[1]));
+					System.out.println(Integer.toBinaryString(block[2]));
+					
+					//block[0] = getModifiedPixel(block[0], 139, getHighK());
+					block[1] = getModifiedPixel(block[1], 146, getHighK());
+					block[2] = getModifiedPixel(block[2], 137, getHighK());
+					//block[3] = getModifiedPixel(block[3], 142, getHighK());
+										
+					System.out.println("After modification: " + Arrays.toString(block));
+					System.out.println("Bits:");
+					System.out.println(Integer.toBinaryString(block[1]));
+					System.out.println(Integer.toBinaryString(block[2]));
+					
+					block = readjustPixelLayer(block, getHighK(), D);
+					
+					System.out.println("After readjustment: " + Arrays.toString(block));
+				} else {
+					System.out.println("low level");
+					block[0] = setEmbeddedPixel(block[0], bits1, getLowK());
+					block[1] = setEmbeddedPixel(block[1], bits2, getLowK());
+					block[2] = setEmbeddedPixel(block[2], bits3, getLowK());
+					block[3] = setEmbeddedPixel(block[3], bits4, getLowK());
+				}
 				*/
+				
 				success = xinLiaoEncode(coverImage, stegoFile, txtKey.getText(), lblFileName.getText());
 			}
 			else { // comboBox.getSelectedItem().toString().equals("LSB Gandharba Swain")
@@ -519,7 +569,7 @@ public class Steganography {
 	}
 	
 	private int getThreshold(){
-		return 5;
+		return 12;
 	}
 	
 	private int getMinPixel(Color pixels[], int layer){
@@ -596,9 +646,9 @@ public class Steganography {
 		return result;
 	}
 	
-	private int setEmbeddedPixel(int pixel, int[] bits, int k){
+	private int setEmbeddedPixel(int pixel, ArrayList<Integer> bits, int k){
 		for(int i=0;i<k;i++){
-			if(bits[i] == 1){
+			if(bits.get(i) == 1){
 				pixel |= 1 << i;
 			} else {
 				pixel &= ~(1 << i);
@@ -621,30 +671,42 @@ public class Steganography {
 	private int getModifiedPixel(int LSBPixel, int originPixel, int k){
 		int diff = Math.abs(LSBPixel - originPixel);
 		
-		// change MSB of embedded pixel to 1
-		int modifiedPixelOne = (LSBPixel | (1 << (k+1)));
-		int modifiedPixelZero = (LSBPixel & ~(1 << (k+1)));
+		// get unembedded parts. 8 - k
+		int unembeddedBits = LSBPixel >> k;
+		int embeddedBits = LSBPixel & ((1 << k) - 1);
 		
-		int oneDiff = Math.abs(modifiedPixelOne - originPixel);
-		int zeroDiff = Math.abs(modifiedPixelZero - originPixel);
+		//System.out.println("Unembedded: " + Integer.toBinaryString(unembeddedBits));
+		//System.out.println("  Embedded: " + Integer.toBinaryString(embeddedBits));
 		
-		if(oneDiff < diff && oneDiff < zeroDiff){
-			return modifiedPixelOne;
-		} else if(zeroDiff < diff && zeroDiff < oneDiff){
-			return modifiedPixelZero;
+		// opsi 1: + 1
+		int unembeddedBits1 = unembeddedBits + 1;
+		int valueAdd = (unembeddedBits1 << k) + embeddedBits;
+		
+		//System.out.println("     Add 1: " + Integer.toBinaryString(valueAdd));
+		
+		// opsi 2: - 1
+		int unembeddedBits0 = unembeddedBits - 1;
+		int valueDec = (unembeddedBits0 << k) + embeddedBits;
+		
+		//System.out.println("     Dec 1: " + Integer.toBinaryString(valueDec));
+		
+		if(Math.abs(valueAdd - originPixel) < diff && Math.abs(valueAdd - originPixel) < Math.abs(valueDec - originPixel)){
+			return valueAdd;
+		} else if(Math.abs(valueDec - originPixel) < diff && Math.abs(valueDec - originPixel) < Math.abs(valueAdd - originPixel)){
+			return valueDec;
 		} else {
 			return LSBPixel;
-		}		
+		}
 	}
 	
-	private int[] readjustPixelLayer(int[] pixelComp, int k){ 
+	private int[] readjustPixelLayer(int[] pixelComp, int k, float D){ 
 		int[] readjustPixelComp = new int[4];
 		float min3 = Float.MAX_VALUE;
-		float D = getAvgDiff(pixelComp);
 		
 		for(int i=-1;i<2;i++){
 			int[] tempPixel = new int[4];
 			boolean isNegative = false;
+			
 			for(int j=0;j<4;j++){
 				tempPixel[j] = pixelComp[j] + i * ((int) Math.pow(2, k));
 				if(tempPixel[j] < 0){
@@ -652,12 +714,8 @@ public class Steganography {
 				}
 			}
 			
-			if(isNegative){
-				continue;
-			}
-			
 			float tempD = getAvgDiff(tempPixel);
-			if(checkLevel(D) == checkLevel(tempD) && !isErrorBlock(tempPixel)){
+			if(checkLevel(D) == checkLevel(tempD) && !isErrorBlock(tempPixel) && !isNegative){
 				// calculate temp min3, compare with current. if temp is less, set temp as current
 				float tempMin3 = 0;
 				for(int j=0;j<4;j++){
@@ -800,7 +858,7 @@ public class Steganography {
 			embeddedStegoBits[(i*8)+7] = (embeddedStegoBytes[i])&1;
 		}
 		
-		//System.out.println("Bit version: " + Arrays.toString(embeddedStegoBits));
+		//System.out.println("Bit version: " + Arrays.toString(embeddedStegoBits) + "\n\n");
 		
 		if(embeddedStegoBytes.length <= maxBytesCapacity){
 			int embeddedBitIndex = 0;
@@ -833,67 +891,78 @@ public class Steganography {
 							// not an error block and there is something left to embed
 							if(!isErrorBlock(pixels, k) && embeddedBitIndex < stegoBitsLength){
 								if(j == 120 && i == 0){
-									System.out.println("is not error block");
+									//System.out.println("is not error block");
 								}
 								// embed
 								// use low k
 								if(getAvgDiff(pixels, k) <= getThreshold()){
 									for(int m=0;m<4;m++){
-										int[] embed = new int[getLowK()];
-										for(int n=embeddedBitIndex;n<embeddedBitIndex+getLowK();n++){
-											embed[n-embeddedBitIndex] = embeddedStegoBits[n];
-										}
-										embeddedBitIndex += getLowK();
-										
-										
-										if(j == 120 && i == 0 && m == 3){
-											//System.out.println("origin blue: " + embeddedLayerPixels[2][3]);
+										ArrayList<Integer> embed = new ArrayList<Integer>();
+										int takenLength = (embeddedBitIndex+getLowK() < embeddedStegoBits.length ? embeddedBitIndex+getLowK() : embeddedStegoBits.length);
+										for(int n=embeddedBitIndex;n<takenLength;n++){
+											embed.add(embeddedStegoBits[n]);
 										}
 										
-										//System.out.println("Saving " + Arrays.toString(embed) + " with length: " + getLowK() + " in (" + j + ", " + i + ")");
+										embeddedBitIndex += embed.size();
 										
-										embeddedLayerPixels[k][m] = setEmbeddedPixel(getBlockLayer(pixels, k)[m], embed, getLowK());
 										
-										if(j == 120 && i == 0 && m == 3){
-											//System.out.println("embedded blue: " + embeddedLayerPixels[2][3]);
+										
+										if(j == 36 && i == 0 && k == 2){
+											System.out.println("Embedding bits: " + embed.toString() + ", initial D: " + getAvgDiff(embeddedLayerPixels[k]));
+											System.out.println("Initial Elmt: " + Arrays.toString(embeddedLayerPixels[k]));
 										}
+										
+										System.out.println("Saving " + embed.toString() + " in (" + j + ", " + i + ")");
+										
+										//System.out.println("origin block: " + Arrays.toString(embeddedLayerPixels[k]));
+										
+										embeddedLayerPixels[k][m] = setEmbeddedPixel(getBlockLayer(pixels, k)[m], embed, embed.size());
+										
+										if(j == 36 && i == 0 && k == 2){
+											System.out.println("Embedded Elmt: " + Arrays.toString(embeddedLayerPixels[k]));
+										}
+										
+										//System.out.println("embedded block: " + Arrays.toString(embeddedLayerPixels[k]));
 										
 										// apply modified LSB subtitution method
 										embeddedLayerPixels[k][m] = getModifiedPixel(embeddedLayerPixels[k][m], getBlockLayer(pixels, k)[m], getLowK());
 										
-										if(j == 120 && i == 0 && m == 3){
-											//System.out.println("modified blue: " + embeddedLayerPixels[2][3]);
+										if(j == 36 && i == 0 && k == 2){
+											System.out.println("Modified Elmt: " + Arrays.toString(embeddedLayerPixels[k]));
 										}
+										
+										//System.out.println("modified block: " + Arrays.toString(embeddedLayerPixels[k]));
 									}
 									
 									// readjust
-									embeddedLayerPixels[k] = readjustPixelLayer(embeddedLayerPixels[k], getLowK());
+									embeddedLayerPixels[k] = readjustPixelLayer(embeddedLayerPixels[k], getLowK(), getAvgDiff(pixels, k));
 									
-									if(j == 120 && i == 0){
-										//System.out.println("readjusted blue: " + embeddedLayerPixels[2][3]);
+									if(j == 36 && i == 0 && k == 2){
+										System.out.println("Readjusted Elmt: " + Arrays.toString(embeddedLayerPixels[k]) + ", final D: " + getAvgDiff(embeddedLayerPixels[k]));
 									}
+									
+									//System.out.println("readjusted block: " + Arrays.toString(embeddedLayerPixels[k]));
 									
 								} else { // use high k
 									for(int m=0;m<4;m++){
+														
+										ArrayList<Integer> embed = new ArrayList<Integer>();
+										int takenLength = (embeddedBitIndex+getHighK() < embeddedStegoBits.length ? embeddedBitIndex+getHighK() : embeddedStegoBits.length);
 										
-										if(embeddedBitIndex + getHighK() > embeddedStegoBits.length){
-											System.out.println("ERROR: " + embeddedBitIndex + " + " + getHighK() + " > " + embeddedStegoBits.length);
+										for(int n=embeddedBitIndex;n<takenLength;n++){
+											//System.out.println("n: " + n + ", stego length: " + embeddedStegoBits.length);
+											embed.add(embeddedStegoBits[n]);
 										}
 										
-										int[] embed = new int[getHighK()];
-										System.out.println("length: " + embeddedBitIndex + " " + embeddedStegoBits.length);
-										for(int n=embeddedBitIndex;n<embeddedBitIndex+getHighK()- (embeddedBitIndex + getHighK() - embeddedStegoBits.length);n++){
-											embed[n-embeddedBitIndex] = embeddedStegoBits[n];
-										}
-										embeddedBitIndex += getHighK();
+										embeddedBitIndex += embed.size();
 										
 										if(j == 120 && i == 0 && m == 3 && k == 2){
 											System.out.println("origin: " + Arrays.toString(embeddedLayerPixels[2]));
 										}
 										
-										//System.out.println("Saving " + Arrays.toString(embed) + " with length: " + getHighK() + " in (" + j + ", " + i + ")");
+										System.out.println("Saving " + embed.toString() + " in (" + j + ", " + i + ")");
 										
-										embeddedLayerPixels[k][m] = setEmbeddedPixel(getBlockLayer(pixels, k)[m], embed, getHighK());
+										embeddedLayerPixels[k][m] = setEmbeddedPixel(getBlockLayer(pixels, k)[m], embed, embed.size());
 										
 										if(j == 120 && i == 0 && m == 3 && k == 2){
 											System.out.println("embedded: " + Arrays.toString(embeddedLayerPixels[2]));
@@ -908,7 +977,7 @@ public class Steganography {
 									}
 																
 									// readjust
-									embeddedLayerPixels[k] = readjustPixelLayer(embeddedLayerPixels[k], getHighK());
+									embeddedLayerPixels[k] = readjustPixelLayer(embeddedLayerPixels[k], getHighK(), getAvgDiff(pixels, k));
 									
 									if(j == 120 && i == 0 && k == 2){
 										System.out.println("readjusted: " + Arrays.toString(embeddedLayerPixels[2]));
@@ -916,7 +985,7 @@ public class Steganography {
 								}
 							} else {
 								if(j == 120 && i == 0){
-									System.out.println("is error block");
+									//System.out.println("is error block");
 								}
 							}
 						}
@@ -930,12 +999,7 @@ public class Steganography {
 						for(int m=0;m<4;m++){							
 							Color pixel = null;
 							
-							if(embeddedLayerPixels[2][m] < 0){
-								pixel = new Color(embeddedLayerPixels[0][m], embeddedLayerPixels[1][m], 0);
-								System.out.println(m + " " + posX[m] + " " + posY[m] + ": " + embeddedLayerPixels[0][m] + " " + embeddedLayerPixels[1][m] + " " + embeddedLayerPixels[2][m]);
-							} else {
-								pixel = new Color(embeddedLayerPixels[0][m], embeddedLayerPixels[1][m], embeddedLayerPixels[2][m]);
-							}
+							pixel = new Color(embeddedLayerPixels[0][m], embeddedLayerPixels[1][m], embeddedLayerPixels[2][m]);
 							
 							stegoImage.setRGB(posX[m], posY[m], pixel.getRGB());
 						}
@@ -1004,7 +1068,7 @@ public class Steganography {
 									int bits[] = new int[getLowK()];
 									bits = getEmbeddedPixel(getBlockLayer(pixels, k)[m], getLowK());
 									
-									//System.out.println("Saving " + Arrays.toString(bits) + " with length: " + getLowK() + " in (" + j + ", " + i + ")");
+									System.out.println("Loading " + Arrays.toString(bits) +  " in (" + j + ", " + i + ")");
 									
 									for(int n=0;n<getLowK();n++){
 										resultBits[resultBitIndex++] = bits[n];
@@ -1017,7 +1081,7 @@ public class Steganography {
 									int bits[] = new int[getHighK()];
 									bits = getEmbeddedPixel(getBlockLayer(pixels, k)[m], getHighK());
 									
-									//System.out.println("Saving " + Arrays.toString(bits) + " with length: " + getHighK() + " in (" + j + ", " + i + ")");
+									System.out.println("Loading " + Arrays.toString(bits) + " in (" + j + ", " + i + ")");
 									
 									for(int n=0;n<getHighK();n++){
 										resultBits[resultBitIndex++] = bits[n];
@@ -1043,11 +1107,14 @@ public class Steganography {
 			}
 		}
 		
+		//System.out.println("Bit version: " + Arrays.toString(resultBits) + "\n\n");
+		
 		/*
 		for(int i=0;i<90;i++){
 			String s1 = String.format("%8s", Integer.toBinaryString(result[i] & 0xFF)).replace(' ', '0');
 			System.out.println(s1);
-		} */
+		} 
+		*/
 				
 		result = decryptVigenere(result, key);
 		
